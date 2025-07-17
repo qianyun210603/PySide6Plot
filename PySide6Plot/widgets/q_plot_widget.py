@@ -98,7 +98,7 @@ class CustomizedAxis(AxisItem):
         if self.plot_strs is None:
             return f"{value:.1f}"
         else:
-            if value >= self.min_index and value <= self.max_index:
+            if self.min_index <= value <= self.max_index:
                 return self.plot_strs[round(value)]
             else:
                 return " "

@@ -1,8 +1,8 @@
 from pyqtgraph import QtGui, QtCore
 import pyqtgraph as pg
-from abc import abstractclassmethod
+from abc import abstractmethod
 import numpy as np
-from .style import DEFAULT_STYLE
+from .style import DEFAULT_STYLE, LINE_DEFAULT_STYLE
 from .data_handler import ChildDataFrame, PricesDataFrame, VolumeDataFrame
 
 
@@ -37,8 +37,8 @@ class AdaptiveGraphObject(pg.GraphicsObject):
         super().__init__()
         self.style = None
 
-    @abstractclassmethod
-    def get_local_plot_range(x_start, x_end):
+    @abstractmethod
+    def get_local_plot_range(self, x_start, x_end):
         """
         Abstract method to get the local plot range for the graph object.
 
@@ -51,8 +51,8 @@ class AdaptiveGraphObject(pg.GraphicsObject):
         """
         raise NotImplementedError
 
-    @abstractclassmethod
-    def get_x_ticks():
+    @abstractmethod
+    def get_x_ticks(self):
         """
         Abstract method to get the x-axis ticks for the graph object.
 
@@ -61,8 +61,8 @@ class AdaptiveGraphObject(pg.GraphicsObject):
         """
         raise NotImplementedError
 
-    @abstractclassmethod
-    def get_feature_value(key):
+    @abstractmethod
+    def get_feature_value(self, key):
         """
         Abstract method to get the value of a specific feature for the graph object.
 
@@ -223,7 +223,7 @@ class CandlestickVolumeItem(AdaptiveGraphObject):
         """
         return self.data.get_x_ticks()
 
-    def get_feature_value(self):
+    def get_feature_value(self, key=None):
         """
         Get the feature values for the volume item.
 
@@ -231,3 +231,78 @@ class CandlestickVolumeItem(AdaptiveGraphObject):
             numpy.ndarray: An array of feature values.
         """
         return np.asarray([data[1] / 1e8 for data in self.data])
+
+
+def draw_circle_marker(p, canvas_pt, marker_size):
+    """
+    Draws a circle marker at the specified canvas point.
+
+    Args:
+        p (QPainter): The painter object used for drawing.
+        canvas_pt (QPointF): The point where the marker should be drawn.
+        marker_size (float): The size of the marker.
+    """
+    p.drawEllipse(canvas_pt, marker_size, marker_size)
+
+
+class LinePlotItem(AdaptiveGraphObject):
+    """
+    A class representing a line plot item for displaying data.
+
+    Attributes:
+        data (ChildDataFrame): The data containing the values to be plotted.
+        style (Style, optional): The style of the line plot item. Defaults to DEFAULT_STYLE.
+    """
+
+    MARKER_DRAWER = {"circle": draw_circle_marker, "o": draw_circle_marker}
+
+    def __init__(self, data: ChildDataFrame, style=LINE_DEFAULT_STYLE, marker=None):
+        super().__init__()
+        self.data = data
+        self.style = style
+        self.marker_drawer = self.MARKER_DRAWER.get(marker, None)
+        self.picture = QtGui.QPicture()
+        p = QtGui.QPainter(self.picture)
+        p.setPen(pg.mkPen(self.style.line_color, width=self.style.line_width))
+        x = data.data_frame.index.to_numpy()
+        for data_key in data.data_keys:
+            if data_key not in data.data_frame.columns:
+                raise ValueError(f"Data key '{data_key}' not found in data frame.")
+            y = data.data_frame[data_key].to_numpy()
+            p.drawPolyline(QtGui.QPolygonF([QtCore.QPointF(x[i], y[i]) for i in range(len(x))]))
+        p.end()
+
+    def paint(self, p, *args):
+        p.drawPicture(0, 0, self.picture)
+        if self.marker_drawer is not None:
+            transform = p.transform()
+            # Set marker color
+            p.setPen(pg.mkPen(self.style.marker_color, width=self.style.line_width))
+            p.setBrush(pg.mkBrush(self.style.marker_color))
+            marker_size = self.style.marker_size / 2
+            x = self.data.data_frame.index.to_numpy()
+            # Reset transformation to canvas transform, so marker is unaffected by data scaling.
+            p.resetTransform()
+            for data_key in self.data.data_keys:
+                if data_key not in self.data.data_frame.columns:
+                    continue
+                y = self.data.data_frame[data_key].to_numpy()
+                for i in range(len(x)):
+                    # Map data point to canvas coordinate.
+                    data_pt = QtCore.QPointF(x[i], y[i])
+                    canvas_pt = transform.map(data_pt)
+                    self.marker_drawer(p, canvas_pt, marker_size)
+            # Restore the original transformation
+            p.setTransform(transform)
+
+    def boundingRect(self):
+        return QtCore.QRectF(self.picture.boundingRect())
+
+    def get_local_plot_range(self, x_start, x_end):
+        return self.data.get_local_range(x_start, x_end)
+
+    def get_x_ticks(self):
+        return self.data.get_x_ticks()
+
+    def get_feature_value(self, key=None):
+        return self.data.get_feature_value(key)

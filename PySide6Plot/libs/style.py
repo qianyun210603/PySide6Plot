@@ -72,8 +72,41 @@ def default_style_configs() -> ConfigurationsHandler:
     return configs_handler
 
 
-def make_style(style_yaml_file="", **kwargs):
-    configs_handler = default_style_configs()
+def line_style_configs() -> ConfigurationsHandler:
+    configs_handler = ConfigurationsHandler()
+    configs_handler.add_config_item(
+        "line_color",
+        default_value=(255, 0, 0),
+        value_type=tuple,
+        in_func=lambda x, other_config: tuple_to_color(x),
+        out_func=lambda x, other_config: color_to_rbg_tuple(x),
+        description="color of the line",
+    )
+    configs_handler.add_config_item(
+        "line_width",
+        default_value=2.0,
+        value_type=float,
+        description="width of the line, the unit is pixel",
+    )
+    configs_handler.add_config_item(
+        "marker_color",
+        default_value=(255, 0, 0),
+        value_type=tuple,
+        in_func=lambda x, other_config: tuple_to_color(x),
+        out_func=lambda x, other_config: color_to_rbg_tuple(x),
+        description="color of the marker",
+    )
+    configs_handler.add_config_item(
+        "marker_size",
+        default_value=5.0,
+        value_type=float,
+        description="size of the marker",
+    )
+    return configs_handler
+
+
+def make_style(configs_handler=None, style_yaml_file="", **kwargs):
+    configs_handler = configs_handler or default_style_configs()
     if style_yaml_file != "":
         configs_handler.set_config_items_from_yaml(style_yaml_file)
     configs_handler.set_config_items(**kwargs)
@@ -117,3 +150,4 @@ def set_background_with_theme(widget: QWidget, theme=None):
 
 
 DEFAULT_STYLE = make_style()
+LINE_DEFAULT_STYLE = make_style(configs_handler=line_style_configs(), line_color=(255, 0, 0))

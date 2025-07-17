@@ -38,6 +38,9 @@ class ChildDataFrame:
             min_y_key (str, optional): The key to access the minimum y-value data. Defaults to None.
             x_label_key (str, optional): The key to access the x-label data. Defaults to None.
         """
+        if "date" not in data_frame.columns:
+            if isinstance(data_frame.index, pd.DatetimeIndex):
+                data_frame.reset_index(inplace=True, drop=False)
         data_keys = data_keys if isinstance(data_keys, list) else [data_keys]
         self.data_keys = deepcopy(data_keys)
         if max_y_key is not None:
