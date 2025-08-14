@@ -101,10 +101,9 @@ class QStockPlotter(QWidget):
         # self.average_line_component.add_default_average_lines()
 
     def remove_main_item(self):
-        if self.main_item is None:
-            raise Exception("No main item exists.")
-        self.main_plotter.remove_item(self.main_item)
-        self.main_item = None
+        if self.main_item is not None:
+            self.main_plotter.remove_item(self.main_item)
+            self.main_item = None
 
     def __on_show_up_button_clicked(self):
         if self.navigation_widget.isHidden():
